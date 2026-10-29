@@ -29,7 +29,7 @@
                 Logout
               </button>
             </li>
-            <!-- Editor-only links -->
+            <!-- Editor only links -->
             <template v-if="user.isEditor">
               <li>
                 <router-link to="/clientform">
