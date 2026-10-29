@@ -1,4 +1,4 @@
-<!-- Login view. Users log in with their username and password. -->
+<!-- Login view. Users log in with theirusername and password. -->
 <template>
   <div>
     <h1 class="font-bold text-4xl text-red-700 tracking-widest text-center mt-10">Welcome</h1>
