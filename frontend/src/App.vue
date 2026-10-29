@@ -126,7 +126,7 @@ onMounted(async () => {
 
 <style scoped>
 #_container {
-  background-color: #c8102e;
+  background-color: #c30020;
   color: white;
   padding: 18px;
 }
@@ -141,4 +141,3 @@ onMounted(async () => {
   cursor: pointer;
 }
 </style>
-
