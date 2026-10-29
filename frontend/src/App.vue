@@ -126,7 +126,7 @@ onMounted(async () => {
 
 <style scoped>
 #_container {
-  background-color: #c30020;
+  background-color: #1400c3;
   color: white;
   padding: 18px;
 }
