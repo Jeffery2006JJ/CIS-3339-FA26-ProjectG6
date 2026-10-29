@@ -1,22 +1,28 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { useToast } from 'vue-toastification'
 import { useLoggedInUserStore } from '../store/loggedInUser'
 
-// make all paths and names lowercase for consistency
+// Route meta:
+//   requiresAuth   - must be logged in
+//   requiresEditor - must be logged in AND have the "editor" role (F4)
+// Paths and names are lowercase; component file names must match exactly
+// (Mac/Linux file systems are case-sensitive).
 const routes = [
   {
     path: '/',
+    name: 'home',
+    meta: { requiresAuth: true },
     component: () => import('../views/home.vue')
   },
   {
-    path: "/login",
-    name: "login",
+    path: '/login',
+    name: 'login',
     component: () => import('../views/login.vue')
   },
   {
     path: '/clientform',
     name: 'clientform',
-    // only authenticated users can create clients
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresEditor: true },
     component: () => import('../views/clientform.vue')
   },
   {
@@ -34,7 +40,7 @@ const routes = [
   {
     path: '/eventform',
     name: 'eventform',
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresEditor: true },
     component: () => import('../views/eventform.vue')
   },
   {
@@ -47,12 +53,12 @@ const routes = [
     path: '/eventdetails/:id',
     name: 'eventdetails',
     meta: { requiresAuth: true },
-    component: () => import('../views/eventdetails.vue')
+    component: () => import('../views/eventDetails.vue')
   },
   {
     path: '/serviceform',
     name: 'serviceform',
-    meta: { requiresAuth: true },
+    meta: { requiresAuth: true, requiresEditor: true },
     component: () => import('../views/serviceform.vue')
   },
   {
@@ -66,24 +72,37 @@ const routes = [
     name: 'servicedetails',
     meta: { requiresAuth: true },
     component: () => import('../views/servicedetails.vue')
+  },
+  {
+    path: '/:pathMatch(.*)*',
+    name: 'notfound',
+    component: () => import('../views/notfound.vue')
   }
 ]
+
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes
 })
 
-// protecting the routes
+// One global guard for login and editor-only routes.
 router.beforeEach((to) => {
   const store = useLoggedInUserStore()
-  if (to.meta.requiresAuth && !store.isLoggedIn) {
-    return {
-      path: '/login',
-      // save the location we were at to come back later
-      query: { redirect: to.fullPath },
-    }
+  const loggedIn = store.ensureValidSession()
+
+  if (to.meta.requiresAuth && !loggedIn) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+
+  if (to.meta.requiresEditor && !store.isEditor) {
+    useToast().warning('Only editors can open that page.')
+    return { path: '/' }
+  }
+
+  // already logged in - no reason to show the login form
+  if (to.name === 'login' && loggedIn) {
+    return { path: '/' }
   }
 })
 
 export default router
-

@@ -1,130 +1,127 @@
-<!-- This is the main frontend file. It displays a navigation bar and rendered components. -->
-
+<!-- Main layout: navigation sidebar + org name header + the current page. -->
 <template>
   <main class="flex flex-row">
     <div id="_container" class="min-h-screen">
       <header class="w-full">
         <section class="text-center">
-          <img class="m-auto" src="@\assets\DanPersona.svg" />
+          <img class="m-auto" src="./assets/DanPersona.svg" alt="Data Platform logo" />
         </section>
-        <!--Navigation bar-->
-        <nav class="mt-10">
+        <!-- Navigation bar -->
+        <nav class="mt-10" aria-label="Main navigation">
           <ul class="flex flex-col gap-4">
-            <!-- Dashboard link -->
-            <li>
+            <li v-if="user.isLoggedIn">
               <router-link to="/">
-                <span style="position: relative; top: 6px" class="material-icons">dashboard</span>
+                <span class="material-icons nav-icon" aria-hidden="true">dashboard</span>
                 Dashboard
               </router-link>
             </li>
-            <!--Login link - Link only shows is user is logged out-->
+            <!-- Login link only when logged out -->
             <li v-if="!user.isLoggedIn">
               <router-link to="/login">
-                <span style="position:relative; top: 6px" class="material-icons">login</span>
+                <span class="material-icons nav-icon" aria-hidden="true">login</span>
                 Login
               </router-link>
             </li>
-            <!--Logout link - Link only shows is user is logged in-->
-            <li v-if="user.isLoggedIn" @click.prevent="user.logout" style="cursor: pointer;">
-              <span style="position:relative; top: 6px" class="material-icons">logout</span>
-              Logout
-            </li>
-            <!--Client Intake Form link - only shows if user is an editor-->
-            <li v-if="user.role === 'editor'">
-              <router-link to="/clientform">
-                <span style="position: relative; top: 6px" class="material-icons">people</span>
-                Client Intake Form
-              </router-link>
-            </li>
-            <!--Create Event link - only shows if user is an editor-->
-            <li v-if="user.role === 'editor'">
-              <router-link to="/eventform">
-                <span style="position: relative; top: 6px" class="material-icons">event</span>
-                Create Event
-              </router-link>
-            </li>
-            <!--Create Service link - only shows if user is an editor-->
-            <li v-if="user.role === 'editor'">
-              <router-link to="/serviceform">
-                <span style="position: relative; top: 6px" class="material-icons">volunteer_activism</span>
-                Create Service
-              </router-link>
-            </li>
-            <!--Find Client link - only shows if user is logged in-->
+            <!-- Logout only when logged in -->
             <li v-if="user.isLoggedIn">
-              <router-link to="/findclient">
-                <span style="position: relative; top: 6px" class="material-icons">search</span>
-                Find Client
-              </router-link>
+              <button type="button" class="logout-button" @click="user.logout()">
+                <span class="material-icons nav-icon" aria-hidden="true">logout</span>
+                Logout
+              </button>
             </li>
-            <!--Find Event link - only shows if user is logged in-->
-            <li v-if="user.isLoggedIn">
-              <router-link to="/findevents">
-                <span style="position: relative; top: 6px" class="material-icons">search</span>
-                Find Event
-              </router-link>
-            </li>
-            <!--Find Service link - only shows if user is logged in-->
-            <li v-if="user.isLoggedIn">
-              <router-link to="/findservice">
-                <span style="position: relative; top: 6px" class="material-icons">search</span>
-                Find Service
-              </router-link>
-            </li>
+            <!-- Editor-only links -->
+            <template v-if="user.isEditor">
+              <li>
+                <router-link to="/clientform">
+                  <span class="material-icons nav-icon" aria-hidden="true">people</span>
+                  Client Intake Form
+                </router-link>
+              </li>
+              <li>
+                <router-link to="/eventform">
+                  <span class="material-icons nav-icon" aria-hidden="true">event</span>
+                  Create Event
+                </router-link>
+              </li>
+              <li>
+                <router-link to="/serviceform">
+                  <span class="material-icons nav-icon" aria-hidden="true">volunteer_activism</span>
+                  Create Service
+                </router-link>
+              </li>
+            </template>
+            <!-- Links for any logged-in user -->
+            <template v-if="user.isLoggedIn">
+              <li>
+                <router-link to="/findclient">
+                  <span class="material-icons nav-icon" aria-hidden="true">search</span>
+                  Find Client
+                </router-link>
+              </li>
+              <li>
+                <router-link to="/findevents">
+                  <span class="material-icons nav-icon" aria-hidden="true">search</span>
+                  Find Event
+                </router-link>
+              </li>
+              <li>
+                <router-link to="/findservice">
+                  <span class="material-icons nav-icon" aria-hidden="true">search</span>
+                  Find Service
+                </router-link>
+              </li>
+            </template>
           </ul>
         </nav>
+        <!-- Who is logged in -->
+        <p v-if="user.isLoggedIn" class="mt-10 text-sm opacity-90">
+          Signed in as <strong>{{ user.name || 'user' }}</strong>
+          <span class="block capitalize">({{ user.role || 'no role' }})</span>
+        </p>
       </header>
     </div>
     <div class="grow w-4/5">
-      <!--Organization Name Header-->
-      <section class="justify-end items-center h-24 flex"
-        style="background: linear-gradient(250deg, #c8102e 70%, #efecec 50.6%)">
-        <h1 class="mr-20 text-3xl text-white"> {{ orgName }}</h1>
+      <!-- Organization name header -->
+      <section
+        class="justify-end items-center h-24 flex"
+        style="background: linear-gradient(250deg, #c8102e 70%, #efecec 50.6%)"
+      >
+        <h1 class="mr-20 text-3xl text-white">{{ orgName }}</h1>
       </section>
-      <!--Page Content-->
+      <!-- Page content -->
       <div>
-        <router-view></router-view>
+        <router-view />
       </div>
     </div>
   </main>
 </template>
 
-<script>
+<script setup>
+// MIGRATION NOTES (Options API -> Composition API)
+// - setup() { return { user } } + the old data option { orgName } -> top-level store + ref('Dataplatform')
+// - [old created hook] { this.orgName = await getOrgName() } -> onMounted()
+// - BUG FIXED: the old catch block did `throw (error)` with no `error` variable defined
+// - REMOVED: methods.logout() used this.$store.dispatch(...) - leftover Vuex code
+//   in a Pinia app that was never called. The nav calls user.logout() directly.
+// - Role checks use the store's isEditor getter (allowlist) instead of role === 'editor' inline
+// - FIX: logo path used Windows backslashes (@\assets\...) which breaks on Mac/Linux;
+//   now "./assets/DanPersona.svg" with alt text
+// - Logout is now a <button> (keyboard accessible) instead of a clickable <li>
+import { ref, onMounted } from 'vue'
 import { useLoggedInUserStore } from './store/loggedInUser'
 import { getOrgName } from './api/api'
-import { useToast } from 'vue-toastification'
 
-//Notifications
-const toast = useToast()
+const user = useLoggedInUserStore()
+const orgName = ref('Dataplatform')
 
-export default {
-  setup() {
-    const user = useLoggedInUserStore();
-    return { user };
-  },
-  data() {
-    return {
-      orgName: "Dataplatform",
-    };
-  },
-  async created() {
-    try {
-      this.orgName = await getOrgName();
-    } catch {
-      throw (error)
-    }
-  },
-  methods: {
-    logout() {
-      try {
-        this.$store.dispatch('clearSessionData');
-        this.$router.push('/')
-      } catch (error) {
-        toast.error('logout error', error)
-      }
-    },
+onMounted(async () => {
+  try {
+    const name = await getOrgName()
+    if (typeof name === 'string' && name) orgName.value = name
+  } catch {
+    // the header just keeps its default title if the backend is unreachable
   }
-}
+})
 </script>
 
 <style scoped>
@@ -132,5 +129,15 @@ export default {
   background-color: #c8102e;
   color: white;
   padding: 18px;
+}
+.nav-icon {
+  position: relative;
+  top: 6px;
+}
+.logout-button {
+  padding: 0;
+  color: inherit;
+  background: none;
+  cursor: pointer;
 }
 </style>

@@ -1,387 +1,211 @@
-// This file contains all API calls to the API endpoints
-// import axios to make API calls
-import axios from "axios";
+// All calls to the backend REST API go through this file.
+//
+// Error handling lives in ONE place: the response interceptor below. It turns
+// every failed request into a plain Error whose `message` is a short,
+// human-readable string, so components never have to translate errors.
+import axios from 'axios'
+import { getApiBaseUrl } from '../config'
 
-// Create HTTP client with the base URL, and specify that the data sent in the request body is JSON
+const TOKEN_KEY = 'authToken'
+
 const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_ROOT_API,
+  baseURL: getApiBaseUrl(),
   headers: {
-    "Content-Type": "application/json",
-  },
-});
+    'Content-Type': 'application/json'
+  }
+})
 
-// Login related API calls
-// If user logs in successfully, this login sets a header to "apiClient" called "Authorization" with the value of "Bearer <token>" This security token is used to validate API calls
-function setAuthHeader(token) {
-  apiClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+// ---------------------------------------------------------------------------
+// Auth header + token storage
+// ---------------------------------------------------------------------------
+export function setAuthHeader(token) {
+  apiClient.defaults.headers.common['Authorization'] = `Bearer ${token}`
 }
 
-// When user logs out, this function removes the Authorization header from apiClient
-function removeAuthHeader() {
-  delete apiClient.defaults.headers.common["Authorization"];
+export function removeAuthHeader() {
+  delete apiClient.defaults.headers.common['Authorization']
 }
 
-// parsing out error messages from API calls see https://stackoverflow.com/questions/67089014/how-to-read-error-messages-from-javascript-error-object
-function getErrorMessageFromResponseBody(string) {
-  let errorString = string;
-
+export function getStoredToken() {
   try {
-    let json = JSON.parse(string);
-    if (json.errors) {
-      errorString = json.errors[0].msg;
-    }
-  } catch (parseOrAccessError) {}
-
-  return errorString;
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
 }
 
-// API call to log the user in
+export function storeToken(token) {
+  try {
+    localStorage.setItem(TOKEN_KEY, token)
+  } catch {
+    // storage unavailable (private mode etc.) - session just won't survive a refresh
+  }
+}
+
+export function clearStoredToken() {
+  try {
+    localStorage.removeItem(TOKEN_KEY)
+  } catch {
+    // ignore
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Centralized error handling (F2)
+// ---------------------------------------------------------------------------
+
+// main.js registers what should happen on a 401 (clear Pinia session + go to
+// /login). Registering it from outside avoids a circular import between this
+// file, the Pinia store and the router.
+let onUnauthorized = () => {}
+export function setUnauthorizedHandler(handler) {
+  onUnauthorized = handler
+}
+
+// Pull a readable message out of whatever the server sent back.
+// Handles: plain-text bodies, { error }, { message }, and express-validator's { errors: [{ msg }] }.
+export function toErrorMessage(error) {
+  if (!error.response) {
+    return 'Unable to reach the server'
+  }
+  const { status, data } = error.response
+  if (typeof data === 'string' && data.trim()) return data
+  if (data && typeof data === 'object') {
+    if (typeof data.error === 'string') return data.error
+    if (typeof data.message === 'string') return data.message
+    if (Array.isArray(data.errors) && data.errors[0]?.msg) return data.errors[0].msg
+  }
+  return `Request failed (${status})`
+}
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error.response?.status
+    const isLoginRequest = error.config?.url?.includes('/users/login')
+
+    // Expired/invalid token: wipe the session and send the user to /login.
+    // (A failed login attempt is not a session problem, so it is excluded.)
+    if (status === 401 && !isLoginRequest) {
+      clearStoredToken()
+      removeAuthHeader()
+      onUnauthorized()
+    }
+
+    const appError = new Error(toErrorMessage(error))
+    appError.status = status ?? null
+    return Promise.reject(appError)
+  }
+)
+
+// Success responses from the API are sometimes plain text ("Client updated
+// successfully") and sometimes JSON ({ message: "Already registered" }).
+// This gives components one readable string for a toast.
+export function messageFrom(data, fallback = 'Done') {
+  if (typeof data === 'string' && data.trim()) return data
+  if (data && typeof data.message === 'string') return data.message
+  return fallback
+}
+
+// ---------------------------------------------------------------------------
+// Login
+// ---------------------------------------------------------------------------
 export async function loginUser(username, password) {
-  try {
-    const response = await apiClient.post("/users/login", {
-      username,
-      password,
-    });
-    const token = response.data.token;
-    localStorage.setItem("authToken", token);
-    setAuthHeader(token);
-    return token;
-  } catch (error) {
-    if (error.response.status === 400) {
-      let errorString = getErrorMessageFromResponseBody(
-        error.response.data.message
-      );
-      throw new Error(errorString); // API errors get thrown here
-    } else throw error;
-  }
+  const response = await apiClient.post('/users/login', { username, password })
+  return response.data.token
 }
 
-// API call to log the user out
-export function logoutUser() {
-  localStorage.removeItem("authToken");
-  removeAuthHeader();
-}
+// ---------------------------------------------------------------------------
+// Org
+// ---------------------------------------------------------------------------
+export const getOrgName = async () => (await apiClient.get('/org')).data
 
-// Org related API calls
-// API call to get org name
-export async function getOrgName() {
-  const response = await apiClient.get(`/org`);
-  return response.data;
-}
+// ---------------------------------------------------------------------------
+// Events
+// ---------------------------------------------------------------------------
+export const getEvents = async () => (await apiClient.get('/events/')).data
 
-// Events related API calls
-// API call to get all events for org
-export const getEvents = async () => {
-  try {
-    const response = await apiClient.get("/events/");
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+export const getEventById = async (id) => (await apiClient.get(`/events/id/${id}`)).data
 
-// API call to GET single event by ID
-export const getEventById = async (id) => {
-  try {
-    const response = await apiClient.get(`/events/id/${id}`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
-
-// API call to GET events based on search query
 export const searchEvents = async (query) => {
-  try {
-    let params = {};
-    if (query.searchBy === "name") {
-      params.searchBy = query.searchBy;
-      params.name = query.name || "";
-    } else if (query.searchBy === "date") {
-      params.searchBy = "date";
-      params.eventDate = query.eventDate || "";
-    }
-    const response = await apiClient.get(`/events/search`, {
-      params: params,
-    });
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+  const params = { searchBy: query.searchBy }
+  if (query.searchBy === 'name') params.name = query.name || ''
+  if (query.searchBy === 'date') params.eventDate = query.eventDate || ''
+  return (await apiClient.get('/events/search', { params })).data
+}
 
-// API call to GET events for which a client is signed up
-export const getClientEvents = async (id) => {
-  try {
-    const response = await apiClient.get(`/events/client/${id}`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+// events a client is registered for
+export const getClientEvents = async (id) => (await apiClient.get(`/events/client/${id}`)).data
 
-// API call to GET events for which a client is not signed up
-export const getNonClientEvents = async (id) => {
-  try {
-    const response = await apiClient.get(`/events/client/${id}/not-registered`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+// events a client is NOT registered for
+export const getNonClientEvents = async (id) =>
+  (await apiClient.get(`/events/client/${id}/not-registered`)).data
 
-// API call to GET all attendees for an event
-export const getEventAttendees = async (id) => {
-  try {
-    const response = await apiClient.get(`/events/attendees/${id}`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+export const getEventAttendees = async (id) => (await apiClient.get(`/events/attendees/${id}`)).data
 
-// API call to GET all events for a given service
-export const getEventsByServiceId = async (id) => {
-  try {
-    const response = await apiClient.get(`/events/service/${id}`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+export const getEventsByServiceId = async (id) => (await apiClient.get(`/events/service/${id}`)).data
 
-// API call to POST new event
-export const createEvent = async (eventData) => {
-  try {
-    const response = await apiClient.post("/events/", eventData);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+export const createEvent = async (eventData) => (await apiClient.post('/events/', eventData)).data
 
-// API call to PUT update event
-export const updateEvent = async (id, eventData) => {
-  try {
-    const response = await apiClient.put(`/events/update/${id}`, eventData);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+export const updateEvent = async (id, eventData) =>
+  (await apiClient.put(`/events/update/${id}`, eventData)).data
 
-// API call to PUT add attendee to event
-export const registerAttendee = async (eventId, clientId) => {
-  try {
-    const response = await apiClient.put(
-      `/events/register`,
-      {},
-      {
-        params: {
-          event: eventId,
-          client: clientId,
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+export const registerAttendee = async (eventId, clientId) =>
+  (await apiClient.put('/events/register', {}, { params: { event: eventId, client: clientId } })).data
 
-// API call to PUT remove attendee from event
-export const deregisterAttendee = async (eventId, clientId) => {
-  try {
-    const response = await apiClient.put(
-      `/events/deregister`,
-      {},
-      {
-        params: {
-          event: eventId,
-          client: clientId,
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+export const deregisterAttendee = async (eventId, clientId) =>
+  (await apiClient.put('/events/deregister', {}, { params: { event: eventId, client: clientId } })).data
 
-// API call to DELETE event by ID
-export const deleteEvent = async (id) => {
-  try {
-    const response = await apiClient.delete(`/events/${id}`);
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+export const deleteEvent = async (id) => (await apiClient.delete(`/events/${id}`)).data
 
-// API call to get events for last two month for dashboard
-export const getAttendance = async () => {
-  try {
-    const response = await apiClient.get("/events/attendance");
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+// events from the last two months, for the dashboard
+export const getAttendance = async () => (await apiClient.get('/events/attendance')).data
 
-// Clients related API calls
-// API call to GET all clients for org
-export const getClients = async () => {
-  try {
-    const response = await apiClient.get("clients");
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+// ---------------------------------------------------------------------------
+// Clients
+// ---------------------------------------------------------------------------
+export const getClients = async () => (await apiClient.get('/clients')).data
 
-// API call to GET single client by ID
-export const getClientById = async (id) => {
-  try {
-    const response = await apiClient.get(`/clients/id/${id}`);
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+export const getClientById = async (id) => (await apiClient.get(`/clients/id/${id}`)).data
 
-// API call to GET entries based on search query
 export const searchClients = async (query) => {
-  try {
-    let params = {};
-    if (query.searchBy === "name") {
-      params.searchBy = query.searchBy;
-      params.firstName = query.firstName || "";
-      params.lastName = query.lastName || "";
-    } else if (query.searchBy === "number") {
-      params.searchBy = query.searchBy;
-      params.phoneNumber = query.phoneNumber || "";
-    }
-    const response = await apiClient.get("/clients/search", {
-      params: params,
-    });
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
+  const params = { searchBy: query.searchBy }
+  if (query.searchBy === 'name') {
+    params.firstName = query.firstName || ''
+    params.lastName = query.lastName || ''
+  } else if (query.searchBy === 'number') {
+    params.phoneNumber = query.phoneNumber || ''
   }
-};
+  return (await apiClient.get('/clients/search', { params })).data
+}
 
-// API call to POST new client
-export const createClient = async (newClient) => {
-  try {
-    const response = await apiClient.post("/clients", newClient);
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+export const createClient = async (newClient) => (await apiClient.post('/clients', newClient)).data
 
-// API call to PUT update client
-export const updateClient = async (id, updatedClient) => {
-  try {
-    const response = await apiClient.put(
-      `/clients/update/${id}`,
-      updatedClient
-    );
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+export const updateClient = async (id, updatedClient) =>
+  (await apiClient.put(`/clients/update/${id}`, updatedClient)).data
 
-// API call to delete client
-export const deleteClientbyId = async (id) => {
-  try {
-    const response = await apiClient.delete(`/clients/${id}`);
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+export const deleteClientbyId = async (id) => (await apiClient.delete(`/clients/${id}`)).data
 
-// API call to get events for dashboard
-export const getClientsByZipCode = async () => {
-  try {
-    const response = await apiClient.get("/clients/byzip");
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+// client counts by zip code, for the dashboard
+export const getClientsByZipCode = async () => (await apiClient.get('/clients/byzip')).data
 
-// API calls related to services
-// API call to get all services for org
-export const getServices = async () => {
-  try {
-    const response = await apiClient.get("/services/");
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+// ---------------------------------------------------------------------------
+// Services
+// ---------------------------------------------------------------------------
+export const getServices = async () => (await apiClient.get('/services/')).data
 
-// API call to GET single service by ID
-export const getServiceById = async (id) => {
-  try {
-    const response = await apiClient.get(`/services/id/${id}`);
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+export const getServiceById = async (id) => (await apiClient.get(`/services/id/${id}`)).data
 
-// API call to GET services based on search query
 export const searchServices = async (query) => {
-  try {
-    let params = {};
-    params.searchBy = query.searchBy;
-    if (query.searchBy === "name") {
-      params.name = query.name || "";
-    } else if (query.searchBy === "description") {
-      params.description = query.description;
-    }
-    const response = await apiClient.get("/services/search", {
-      params: params,
-    });
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+  const params = { searchBy: query.searchBy }
+  if (query.searchBy === 'name') params.name = query.name || ''
+  if (query.searchBy === 'description') params.description = query.description || ''
+  return (await apiClient.get('/services/search', { params })).data
+}
 
-// API call to POST new service
-export const createService = async (newService) => {
-  try {
-    const response = await apiClient.post("/services", newService);
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+export const createService = async (newService) => (await apiClient.post('/services', newService)).data
 
-// API call to PUT update service
-export const updateService = async (id, updatedService) => {
-  try {
-    const response = await apiClient.put(
-      `/services/update/${id}`,
-      updatedService
-    );
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+export const updateService = async (id, updatedService) =>
+  (await apiClient.put(`/services/update/${id}`, updatedService)).data
 
-// API call to DELETE service by ID
-export const deleteService = async (id) => {
-  try {
-    const response = await apiClient.delete(`/services/${id}`);
-    return response.data;
-  } catch (error) {
-    throw error.response.data;
-  }
-};
+export const deleteService = async (id) => (await apiClient.delete(`/services/${id}`)).data

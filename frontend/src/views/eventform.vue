@@ -1,151 +1,142 @@
-<!-- This view allows for the creation of a new event -->
+<!-- Lets an editor create a new event. -->
 <template>
   <main>
-    <div>
-      <!--Header-->
-      <h1 class="font-bold text-4xl text-red-700 tracking-widest text-center mt-10">
-        Create New Event
-      </h1>
-    </div>
+    <h1 class="font-bold text-4xl text-red-700 tracking-widest text-center mt-10">Create New Event</h1>
     <div class="px-10 py-20">
-      <!--Form-->
-      <!-- @submit.prevent stops the submit event from reloading the page-->
-      <form @submit.prevent="handleSubmitForm">
-        <!-- grid container -->
+      <form novalidate @submit.prevent="handleSubmitForm">
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
           <h2 class="text-2xl font-bold">Event Details</h2>
 
-          <!-- Event Name Input Field -->
+          <!-- Event name -->
           <div class="flex flex-col">
             <label class="block">
               <span class="text-gray-700">Event Name</span>
               <span style="color: #ff0000">*</span>
-              <input type="text"
+              <input
+                v-model="event.name"
+                type="text"
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                v-model="event.name" />
+              />
             </label>
-            <!-- Validation error messages -->
-            <span v-if="v$.event.name.$error" class="text-red-500">
-              Event Name is required
-            </span>
+            <span v-if="v$.name.$error" class="text-red-500">Event Name is required</span>
           </div>
 
-          <!-- Date input field -->
+          <!-- Date -->
           <div class="flex flex-col">
             <label class="block">
               <span class="text-gray-700">Date</span>
               <span style="color: #ff0000">*</span>
               <input
+                v-model="event.date"
+                type="date"
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                v-model="event.date" type="date" />
+              />
             </label>
-            <!-- Validation error messages -->
-            <span v-if="v$.event.date.$error" class="text-red-500">
-              <span v-if="v$.event.date.required.$invalid">
-                Event Date is required
-              </span>
-              <span v-else-if="!v$.event.date.required.$invalid && v$.event.date.validDate.$invalid">
-                Event Date must be a valid date
-              </span>
-              <span
-                v-else-if="!v$.event.date.required.$invalid && !v$.event.date.validDate.$invalid && v$.event.date.notBeforeToday.$invalid">
-                New Event Date cannot be in the past.
-              </span>
-            </span>
+            <span v-if="v$.date.$error" class="text-red-500">{{ dateError }}</span>
           </div>
 
           <div></div>
           <div></div>
-          <!-- Description input field -->
+          <!-- Description -->
           <div class="flex col-span-2 flex-col">
             <label class="block">
               <span class="text-gray-700">Description</span>
               <textarea
+                v-model="event.description"
+                rows="2"
                 class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                rows="2"></textarea>
+              ></textarea>
             </label>
           </div>
         </div>
 
-        <!-- Services Offered at Event checkboxes -->
+        <!-- Services offered at the event -->
         <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10 mt-10">
           <h2 class="text-2xl font-bold">Services Offered at Event</h2>
           <div class="flex flex-col grid-cols-3">
-            <div>
-              <ul v-if="activeServices.length" class="space-y-2">
-                <li v-for="service in activeServices" :key="service._id" :data-service-id="service._id"
-                  class="rounded-lg border border-gray-300 p-2 hover:bg-gray-100 transition-colors relative">
-                  <label class="block w-full h-full">
-                    <input type="checkbox" :id="service._id" :value="service._id"
-                      :checked="event.services.includes(service._id)" v-model="event.services"
-                      class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-offset-0 focus:ring-indigo-200 focus:ring-opacity-50 mr-2">
-                    <span class="font-medium">{{ service.name }}</span>
-                  </label>
-                </li>
-              </ul> 
-              <!--If there are no active services for the user's organization, this will appear instead of list of checkboxes-->
-              <p v-else class="text-gray-600">No Active Services Available</p>
-            </div>
+            <p v-if="servicesLoading" class="text-gray-500">Loading services...</p>
+            <ul v-else-if="activeServices.length" class="space-y-2">
+              <li
+                v-for="service in activeServices"
+                :key="service._id"
+                class="rounded-lg border border-gray-300 p-2 hover:bg-gray-100 transition-colors relative"
+              >
+                <label class="block w-full h-full">
+                  <input
+                    v-model="event.services"
+                    type="checkbox"
+                    :value="service._id"
+                    class="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-offset-0 focus:ring-indigo-200 focus:ring-opacity-50 mr-2"
+                  />
+                  <span class="font-medium">{{ service.name }}</span>
+                </label>
+              </li>
+            </ul>
+            <p v-else class="text-gray-600">No Active Services Available</p>
           </div>
         </div>
 
-        <!-- grid container -->
+        <!-- Address -->
         <div class="mt-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
           <h2 class="text-2xl font-bold">Address</h2>
-          <!-- Address 1 input field -->
           <div class="flex flex-col">
             <label class="block">
               <span class="text-gray-700">Address Line 1</span>
-              <input type="text"
+              <input
+                v-model="event.address.line1"
+                type="text"
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                placeholder v-model="event.address.line1" />
+              />
             </label>
           </div>
-          <!-- Address 2 input field -->
           <div class="flex flex-col">
             <label class="block">
               <span class="text-gray-700">Address Line 2</span>
-              <input type="text"
+              <input
+                v-model="event.address.line2"
+                type="text"
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                placeholder v-model="event.address.line2" />
+              />
             </label>
           </div>
-          <!-- City input field -->
           <div class="flex flex-col">
             <label class="block">
               <span class="text-gray-700">City</span>
-              <input type="text"
+              <input
+                v-model="event.address.city"
+                type="text"
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                placeholder v-model="event.address.city" />
+              />
             </label>
           </div>
           <div></div>
-          <!-- County input field -->
           <div class="flex flex-col">
             <label class="block">
               <span class="text-gray-700">County</span>
-              <input type="text"
+              <input
+                v-model="event.address.county"
+                type="text"
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                placeholder v-model="event.address.county" />
+              />
             </label>
           </div>
-          <!-- Zip code field -->
           <div class="flex flex-col">
             <label class="block">
               <span class="text-gray-700">Zip Code</span>
-              <input type="text"
+              <input
+                v-model="event.address.zip"
+                type="text"
                 class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-                placeholder v-model="event.address.zip" />
+              />
             </label>
           </div>
         </div>
 
-        <!--Add New Event submit button-->
         <div class="mt-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
           <div></div>
           <div class="flex justify-between mr-20">
-            <button class="bg-red-700 text-white rounded" type="submit">
-              Add New Event
+            <button class="bg-red-700 text-white rounded disabled:opacity-50" type="submit" :disabled="saving">
+              {{ saving ? 'Saving...' : 'Add New Event' }}
             </button>
           </div>
         </div>
@@ -154,98 +145,95 @@
   </main>
 </template>
 
-<script>
-// import vuelidate validations
-import useVuelidate from '@vuelidate/core'
-import { required } from '@vuelidate/validators'
-import { getServices, createEvent } from '../api/api'
+<script setup>
+// MIGRATION NOTES (Options API -> Composition API)
+// - [old data option] event -> reactive(); activeServices -> computed() from the services list
+// - [old data option] openDescriptions was never used -> removed
+// - setup() { useVuelidate() } + validations() -> useVuelidate(rules, event)
+//   (template paths changed from v$.event.name to v$.name)
+// - async mounted() { getServices() } -> onMounted()
+// - [old methods option] handleSubmitForm -> plain async function
+// - this.$router.push -> useRouter()
+// - BUG FIXED: the Description <textarea> had no v-model, so descriptions were never saved
+// - BUG FIXED: "notBeforeToday" compared against the UTC date, so in the evening
+//   (US time) today's date was rejected as "in the past". Now uses the local date.
+// - BUG FIXED: :checked + v-model on the same checkbox -> v-model only
+import { reactive, ref, computed, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
+import useVuelidate from '@vuelidate/core'
+import { required, helpers } from '@vuelidate/validators'
+import { getServices, createEvent, messageFrom } from '../api/api'
 
-//Notifications
+const router = useRouter()
 const toast = useToast()
 
-export default {
-  data() {
-    return {
-      // event variable to hold new event information
-      event: {
-        name: null,
-        description: null,
-        date: null,
-        services: [],
-        address: {
-          line1: null,
-          line2: null,
-          city: null,
-          county: null,
-          zip: null
-        },
-        attendees: [],
-      },
-      //variable to assign service IDs to event (user clicks checkboxes to add services to event)
-      activeServices: [],
-      // variable that determines which services in the List of Services checkboxes have expanded details
-      openDescriptions: [],
-    }
-  },
-  setup() {
-    // Register Vuelidate
-    const v$ = useVuelidate();
-    return { v$ };
-  },
-  validations() {
-    // validations
-    const validDate = (value) => {
-      const date = new Date(value)
-      return !isNaN(date)
-    }
+const event = reactive({
+  name: '',
+  description: '',
+  date: '',
+  services: [],
+  address: { line1: '', line2: '', city: '', county: '', zip: '' },
+  attendees: []
+})
 
-    // prevents form submission if new event has a date before the current date
-    const notBeforeToday = (value) => {
-      const today = new Date()
-      return value >= today.toISOString().split('T')[0]
-    }
+// today's date as YYYY-MM-DD in the user's own time zone
+function localToday() {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
 
-    return {
-      event: {
-        name: { required },
-        date: {
-          required,
-          validDate,
-          notBeforeToday
-        },
-      }
-    }
-  },
-  async mounted() {
-    // when component is mounted, data is loaded
-    try {
-        const response = await getServices();
-        this.activeServices = response.filter(item => item.status === "Active")
-      } catch (error) {
-        toast.error(error)
-      }
-  },
-  methods: {
-    // method called when user tries to create new event
-    async handleSubmitForm() {
-      // Trigger validation
-      this.v$.$validate();
+const validDate = (value) => !helpers.req(value) || !isNaN(new Date(value))
+const notBeforeToday = (value) => !helpers.req(value) || value >= localToday()
 
-      if (this.v$.$error) {
-        toast.error('Please fix input field errors')
-        // Form is invalid, do not proceed
-        return;
-      }
+const rules = {
+  name: { required },
+  date: { required, validDate, notBeforeToday }
+}
+const v$ = useVuelidate(rules, event)
 
-      try {
-        const response = await createEvent(this.event);
-        this.$router.push('/findevents')
-        toast.success(response)
-      } catch (error) {
-        toast.error('error creating new event:', error)
-      }
-    },
-  },
+const dateError = computed(() => {
+  const date = v$.value.date
+  if (date.required.$invalid) return 'Event Date is required'
+  if (date.validDate.$invalid) return 'Event Date must be a valid date'
+  return 'New Event Date cannot be in the past.'
+})
+
+// services list for the checkboxes (only active services can be offered)
+const services = ref([])
+const servicesLoading = ref(true)
+const activeServices = computed(() => services.value.filter((s) => s.status === 'Active'))
+
+onMounted(async () => {
+  try {
+    services.value = await getServices()
+  } catch (err) {
+    toast.error(err.message)
+  } finally {
+    servicesLoading.value = false
+  }
+})
+
+const saving = ref(false)
+
+async function handleSubmitForm() {
+  const valid = await v$.value.$validate()
+  if (!valid) {
+    toast.error('Please fix the highlighted fields')
+    return
+  }
+
+  saving.value = true
+  try {
+    const response = await createEvent(event)
+    toast.success(messageFrom(response, 'Event created'))
+    router.push('/findevents')
+  } catch (err) {
+    toast.error(err.message)
+  } finally {
+    saving.value = false
+  }
 }
 </script>

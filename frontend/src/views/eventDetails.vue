@@ -1,155 +1,175 @@
-<!-- This component allows a user to update a specific event's information. -->
+<!-- View/update one event and see who is registered for it. -->
 <template>
   <main>
-    <div>
-      <!--Header-->
-      <h1 class="font-bold text-4xl text-red-700 tracking-widest text-center mt-10">
-        Event Details
-      </h1>
+    <h1 class="font-bold text-4xl text-red-700 tracking-widest text-center mt-10">Event Details</h1>
+
+    <p v-if="loading" class="text-center text-gray-500 mt-10 animate-pulse">Loading event...</p>
+    <div v-else-if="loadError" class="m-10 rounded border border-red-300 bg-red-50 p-6" role="alert">
+      <p class="font-bold text-red-800">Couldn't load this event</p>
+      <p class="mt-1 text-red-900">{{ loadError }}</p>
+      <button type="button" class="mt-4 bg-red-700 text-white rounded" @click="loadAll">Retry</button>
     </div>
-    <div class="px-10 py-20">
+
+    <div v-else class="px-10 py-20">
+      <p v-if="!user.isEditor" class="mb-6 italic text-gray-600">You have view-only access.</p>
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
         <h2 class="text-2xl font-bold">Event Details</h2>
-        <!-- Event Name input field -->
         <div class="flex flex-col">
           <label class="block">
             <span class="text-gray-700">Event Name</span>
             <span style="color: #ff0000">*</span>
-            <input type="text"
+            <input
+              v-model="event.name"
+              type="text"
+              :readonly="!user.isEditor"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              v-model="event.name" />
-            <span v-if="v$.event.name.$error" class="text-red-500">
-              Event Name is required
-            </span>
+            />
           </label>
+          <span v-if="v$.name.$error" class="text-red-500">Event Name is required</span>
         </div>
-
-        <!-- Date input field -->
         <div class="flex flex-col">
           <label class="block">
             <span class="text-gray-700">Date</span>
             <span style="color: #ff0000">*</span>
-            <input type="date"
+            <input
+              v-model="event.date"
+              type="date"
+              :readonly="!user.isEditor"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              v-model="event.date" />
-            <span v-if="v$.event.date.$error" class="text-red-500">
-              <span v-if="v$.event.date.required.$invalid">
-                Event Date is required
-              </span>
-              <span v-else-if="!v$.event.date.required.$invalid && v$.event.date.validDate.$invalid">
-                Event Date must be a valid date
-              </span>
-            </span>
+            />
           </label>
+          <span v-if="v$.date.$error" class="text-red-500">
+            {{ v$.date.required.$invalid ? 'Event Date is required' : 'Event Date must be a valid date' }}
+          </span>
         </div>
-
         <div></div>
         <div></div>
-        <!-- Description input field -->
         <div class="flex flex-col">
           <label class="block">
             <span class="text-gray-700">Description</span>
             <textarea
+              v-model="event.description"
+              rows="2"
+              :readonly="!user.isEditor"
               class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              rows="2" v-model="event.description"></textarea>
+            ></textarea>
           </label>
         </div>
       </div>
 
-      <!-- Services Offered at Event checkboxes -->
+      <!-- Services offered at the event -->
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10 mt-10">
         <h2 class="text-2xl font-bold">Services Offered at Event</h2>
         <div class="flex flex-col grid-cols-3">
-          <div>
-            <ul v-if="services.length" class="space-y-2">
-              <li v-for="service in services" :key="service._id" :data-service-id="service._id"
-                class="rounded-lg border border-gray-300 p-2 hover:bg-gray-100 transition-colors relative">
-                <label class="block w-full h-full">
-                  <input type="checkbox" :id="service._id" :value="service._id"
-                    :checked="event.services.includes(service._id)" v-model="event.services"
-                    :disabled="service.status === 'Inactive'"
-                    class="rounded border-gray-300 disabled:opacity-50 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-offset-0 focus:ring-indigo-200 focus:ring-opacity-50 mr-2">
-                  <span class="font-medium">{{ service.name }}</span>
-                </label>
-              </li>
-            </ul>
-            <!--If there are no active services for the user's organization, this will appear instead of list of checkboxes-->
-            <p v-else class="text-gray-600">No Active Services Available</p>
-          </div>
+          <ul v-if="services.length" class="space-y-2">
+            <li
+              v-for="service in services"
+              :key="service._id"
+              class="rounded-lg border border-gray-300 p-2 hover:bg-gray-100 transition-colors relative"
+            >
+              <label class="block w-full h-full">
+                <input
+                  v-model="event.services"
+                  type="checkbox"
+                  :value="service._id"
+                  :disabled="!user.isEditor || service.status === 'Inactive'"
+                  class="rounded border-gray-300 disabled:opacity-50 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-offset-0 focus:ring-indigo-200 focus:ring-opacity-50 mr-2"
+                />
+                <span class="font-medium">{{ service.name }}</span>
+                <span v-if="service.status === 'Inactive'" class="ml-2 text-sm text-gray-500">(inactive)</span>
+              </label>
+            </li>
+          </ul>
+          <p v-else class="text-gray-600">No Active Services Available</p>
         </div>
       </div>
 
-      <!-- grid container -->
+      <!-- Address -->
       <div class="mt-10 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
         <h2 class="text-2xl font-bold">Address</h2>
-        <!-- Address 1 input field -->
         <div class="flex flex-col">
           <label class="block">
             <span class="text-gray-700">Address Line 1</span>
-            <input type="text"
+            <input
+              v-model="event.address.line1"
+              type="text"
+              :readonly="!user.isEditor"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder v-model="event.address.line1" />
+            />
           </label>
         </div>
-        <!-- Address 2 input field -->
         <div class="flex flex-col">
           <label class="block">
             <span class="text-gray-700">Address Line 2</span>
-            <input type="text"
+            <input
+              v-model="event.address.line2"
+              type="text"
+              :readonly="!user.isEditor"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder v-model="event.address.line2" />
+            />
           </label>
         </div>
-        <!-- City input field -->
         <div class="flex flex-col">
           <label class="block">
             <span class="text-gray-700">City</span>
-            <input type="text"
+            <input
+              v-model="event.address.city"
+              type="text"
+              :readonly="!user.isEditor"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder v-model="event.address.city" />
+            />
           </label>
         </div>
         <div></div>
-        <!-- County input field -->
         <div class="flex flex-col">
           <label class="block">
             <span class="text-gray-700">County</span>
-            <input type="text"
+            <input
+              v-model="event.address.county"
+              type="text"
+              :readonly="!user.isEditor"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder v-model="event.address.county" />
+            />
           </label>
         </div>
-        <!-- Zip Code input field -->
         <div class="flex flex-col">
           <label class="block">
             <span class="text-gray-700">Zip Code</span>
-            <input type="text"
+            <input
+              v-model="event.address.zip"
+              type="text"
+              :readonly="!user.isEditor"
               class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-              placeholder v-model="event.address.zip" />
+            />
           </label>
         </div>
       </div>
 
-      <!-- grid container -->
+      <!-- Buttons -->
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
         <div></div>
-        <!--Update Event button-->
         <div class="flex justify-between mt-10 mr-20">
-          <button @click="submitEventUpdate" type="submit" class="bg-green-700 disabled:opacity-50 text-white rounded"
-            :disabled="user.role === 'viewer'">
+          <button
+            type="button"
+            class="bg-green-700 disabled:opacity-50 text-white rounded"
+            :disabled="!user.isEditor || busy"
+            @click="submitEventUpdate"
+          >
             Update Event
           </button>
         </div>
-        <!--Delete Event button-->
         <div class="flex justify-between mt-10 mr-20">
-          <button @click="submitDeleteEvent" type="submit" class="bg-red-700  disabled:opacity-50 text-white rounded"
-            :disabled="user.role === 'viewer'">
+          <button
+            type="button"
+            class="bg-red-700 disabled:opacity-50 text-white rounded"
+            :disabled="!user.isEditor || busy"
+            @click="submitDeleteEvent"
+          >
             Delete Event
           </button>
-          <!--Go back button-->
         </div>
         <div class="flex justify-between mt-10 mr-20">
-          <button type="reset" class="border border-red-700 bg-white text-red-700 rounded" @click=this.$router.back()>
+          <button type="button" class="border border-red-700 bg-white text-red-700 rounded" @click="router.back()">
             Go back
           </button>
         </div>
@@ -157,158 +177,145 @@
 
       <hr class="mt-10 mb-10" />
 
-      <!-- grid container -->
+      <!-- Attendees -->
       <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-10">
         <div>
           <h2 class="text-2xl font-bold">List of Attendees</h2>
-          <h3 class="italic">Click table row to view client details</h3>
+          <h3 class="italic">Click a row to view client details</h3>
         </div>
-        <!--Table showing the list of attendees for the selected event-->
         <div class="flex flex-col col-span-2">
-          <table class="min-w-full shadow-md rounded">
-            <thead class="bg-gray-50 text-xl">
-              <tr>
-                <th class="p-4 text-left">Name</th>
-                <th class="p-4 text-left">City</th>
-                <th class="p-4 text-left">Phone Number</th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-gray-300">
-              <tr @click="$router.push({name: 'clientdetails', params: { id: client._id } })" 
-              v-for="client in clients" :key="client._id" class="cursor-pointer"
-                :class="{ 'hoverRow': hoverId === client._id }" @mouseenter="hoverId = client._id"
-                @mouseleave="hoverId = null">
-                <td class="p-2 text-left">
-                  {{ client.firstName + ' ' + client.lastName }}
-                </td>
-                <td class="p-2 text-left">{{ client.address.city }}</td>
-                <td class="p-2 text-left">
-                  {{ client.phoneNumber.primary }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <DataTable
+            :columns="attendeeColumns"
+            :rows="attendees"
+            clickable
+            empty-text="No one is registered for this event yet."
+            @row-click="(client) => router.push({ name: 'clientdetails', params: { id: client._id } })"
+          />
         </div>
       </div>
     </div>
   </main>
 </template>
 
-<script>
-//import vuelidate functionalities
-import useVuelidate from '@vuelidate/core'
-import { required } from '@vuelidate/validators'
-import { useLoggedInUserStore } from "../store/loggedInUser";
-import { getEventById, getEventAttendees, getServices, updateEvent, deleteEvent } from '../api/api'
+<script setup>
+// MIGRATION NOTES (Options API -> Composition API)
+// - [old data option] event -> reactive(); clients, services -> ref()
+// - setup() { useVuelidate(); useLoggedInUserStore() } + validations()
+//     -> useVuelidate(rules, event) and useLoggedInUserStore() at the top level
+// - async mounted() { Promise.all([...]) } -> onMounted(loadAll)
+// - this.$route.params.id -> useRoute(); this.$router -> useRouter()
+// - [old methods option] submitEventUpdate / submitDeleteEvent -> plain async functions
+// - attendees <table> + hoverId highlighting -> DataTable component
+// - SECURITY: :disabled="user.role === 'viewer'" (denylist) -> !user.isEditor (allowlist)
+// - BUG FIXED: delete check compared the attendees ARRAY to 0
+//   (this.event.attendees != 0) -> now checks attendees.length
+// - BUG FIXED: toast.error('error updating event', error) hid the real message
+// - NOTE: this file is eventDetails.vue (capital D). The router used to import
+//   "eventdetails.vue", which broke the build on Mac/Linux. Fixed in router/index.js.
+import { reactive, ref, onMounted } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from 'vue-toastification'
+import useVuelidate from '@vuelidate/core'
+import { required, helpers } from '@vuelidate/validators'
+import { useLoggedInUserStore } from '../store/loggedInUser'
+import DataTable from '../components/DataTable.vue'
+import { toDateInputValue } from '../utils/formatDate'
+import { getEventById, getEventAttendees, getServices, updateEvent, deleteEvent, messageFrom } from '../api/api'
 
-//Notifications
+const route = useRoute()
+const router = useRouter()
 const toast = useToast()
+const user = useLoggedInUserStore()
+const eventId = route.params.id
 
-export default {
-  data() {
-    return {
-      //variable to hold clients for selected event
-      clients: [],
-      //variable to hold services for selected event
-      services: [],
-      //variable to hold event information
-      event: {
-        name: null,
-        description: null,
-        date: null,
-        address: {
-          line1: null,
-          line2: null,
-          city: null,
-          county: null,
-          zip: null
-        },
-        attendees: [],
-        services: []
-      },
-      // variable stores the ID of the row that the mouse is currently hovering over (to highlight the row red)
-      hoverId: null,
-    }
-  },
-  setup() {
-    // register Vuelidate and loggedIn store
-    const v$ = useVuelidate();
-    const user = useLoggedInUserStore();
-    return { v$, user };
-  },
-  validations() {
-    // validations
-    const validDate = (value) => {
-      const date = new Date(value)
-      return !isNaN(date)
-    }
+const emptyEvent = () => ({
+  name: '',
+  description: '',
+  date: '',
+  address: { line1: '', line2: '', city: '', county: '', zip: '' },
+  attendees: [],
+  services: []
+})
 
-    return {
-      event: {
-        name: { required },
-        date: {
-          required,
-          validDate
-        },
-      }
-    }
-  },
-  async mounted() {
-    // when component is mounted, data is loaded
-    try {
-      const [eventResponse, clientsResponse, servicesResponse] = await Promise.all([
-        getEventById(this.$route.params.id),
-        getEventAttendees(this.$route.params.id),
-        getServices(),
-      ]);
+const event = reactive(emptyEvent())
+const attendees = ref([]) // full client records for the attendee list
+const services = ref([]) // all services, for the checkboxes
 
-      eventResponse.date = new Date(eventResponse.date).toISOString().substring(0, 10);
+const loading = ref(true)
+const loadError = ref(null)
+const busy = ref(false)
 
-      this.event = eventResponse;
-      this.clients = clientsResponse;
-      this.services = servicesResponse;
-     // this.inactiveServices = servicesResponse.filter(item => item.status === "Inactive")
+const validDate = (value) => !helpers.req(value) || !isNaN(new Date(value))
+const rules = {
+  name: { required },
+  date: { required, validDate }
+}
+const v$ = useVuelidate(rules, event)
 
-    } catch (error) {
-      toast.error('error loading data', error)
-    }
-  },
-  methods: {
-    // method called when user attempts to update the event -> asks for confirmation
-    async submitEventUpdate() {
-      // Trigger validation
-      this.v$.$validate();
+const attendeeColumns = [
+  { label: 'Name', key: 'name', render: (c) => `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() },
+  { label: 'City', key: 'address.city' },
+  { label: 'Phone Number', key: 'phoneNumber.primary' }
+]
 
-      if (this.v$.$error) {
-        // Form is invalid, do not proceed
-        return;
-      }
+async function loadAll() {
+  loading.value = true
+  loadError.value = null
+  try {
+    const [eventData, attendeeData, serviceData] = await Promise.all([
+      getEventById(eventId),
+      getEventAttendees(eventId),
+      getServices()
+    ])
+    const base = emptyEvent()
+    Object.assign(event, base, eventData, {
+      address: { ...base.address, ...(eventData.address || {}) },
+      services: eventData.services || [],
+      attendees: eventData.attendees || [],
+      // <input type="date"> needs YYYY-MM-DD
+      date: toDateInputValue(eventData.date)
+    })
+    attendees.value = attendeeData
+    services.value = serviceData
+  } catch (err) {
+    loadError.value = err.message
+  } finally {
+    loading.value = false
+  }
+}
 
-      try {
-        const response = await updateEvent(this.$route.params.id, this.event);
-        toast.success(response)
-        this.$router.push('/findevents')
-      } catch (error) {
-        toast.error('error updating event', error)
-      }
-    },
+onMounted(loadAll)
 
-    // method to make the API call to delete the event - can only be deleted if no attendees are in event
-    async submitDeleteEvent() {
-      try {
-        if (this.event.attendees != 0)
-        {
-          toast.info('Event can not be deleted since it has attendees.')
-          return
-        }
-        const response = await deleteEvent(this.$route.params.id);
-        toast.success(response)
-        this.$router.push('/findevents')
-      } catch (error) {
-        toast.error(error)
-      }
-    },
+async function submitEventUpdate() {
+  const valid = await v$.value.$validate()
+  if (!valid) return
+
+  busy.value = true
+  try {
+    const response = await updateEvent(eventId, event)
+    toast.success(messageFrom(response, 'Event updated'))
+    router.push('/findevents')
+  } catch (err) {
+    toast.error(err.message)
+  } finally {
+    busy.value = false
+  }
+}
+
+async function submitDeleteEvent() {
+  if (event.attendees.length > 0) {
+    toast.info('Event can not be deleted since it has attendees.')
+    return
+  }
+  busy.value = true
+  try {
+    const response = await deleteEvent(eventId)
+    toast.success(messageFrom(response, 'Event deleted'))
+    router.push('/findevents')
+  } catch (err) {
+    toast.error(err.message)
+  } finally {
+    busy.value = false
   }
 }
 </script>

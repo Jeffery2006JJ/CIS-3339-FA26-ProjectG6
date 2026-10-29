@@ -1,48 +1,53 @@
+<!-- Doughnut chart of clients per zip code (used on the dashboard). -->
 <template>
   <div class="w-1/2">
-    <canvas class="p-10" ref="zipChart"></canvas>
+    <canvas ref="canvas" class="p-10"></canvas>
   </div>
 </template>
 
-<script>
+<script setup>
+// MIGRATION NOTES (Options API -> Composition API)
+// - props: { label, chartData }   -> defineProps()
+// - this.$refs.zipChart           -> template ref: const canvas = ref(null)
+// - async mounted()               -> onMounted()
+// - NEW: watch() redraws when the data changes; onBeforeUnmount() destroys
+//   the Chart.js instance so it doesn't leak between page visits
+import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
 import { Chart, registerables } from 'chart.js'
+
 Chart.register(...registerables)
-//define props (label and chartData)
-export default {
-  props: {
-    label: {
-      type: Array
+
+const props = defineProps({
+  label: { type: Array, default: () => [] },
+  chartData: { type: Array, default: () => [] }
+})
+
+const canvas = ref(null)
+let chart = null
+
+function draw() {
+  if (chart) chart.destroy()
+  chart = new Chart(canvas.value, {
+    type: 'doughnut',
+    data: {
+      labels: props.label,
+      datasets: [{ borderWidth: 1, data: props.chartData }]
     },
-    chartData: {
-      type: Array
-    }
-  },
-  async mounted() { //uses the data to load the chart's values
-    await new Chart(this.$refs.zipChart, {
-      type: 'doughnut',
-      data: {
-        labels: this.label,
-        datasets: [
-          {
-            borderWidth: 1,
-            data: this.chartData // Update this line
-          }
-        ]
+    options: {
+      plugins: {
+        legend: { display: false },
+        title: { display: true, text: 'Clients by Zip Code' }
       },
-      options: {
-        plugins: {
-          legend: {
-            display: false
-          },
-          title: {
-            display: true,
-            text: 'Clients by Zip Code'
-          }
-        },
-        responsive: true,
-        maintainAspectRatio: true
-      }
-    })
-  },
+      responsive: true,
+      maintainAspectRatio: true
+    }
+  })
 }
+
+onMounted(draw)
+watch(() => [props.label, props.chartData], draw)
+onBeforeUnmount(() => {
+  if (chart) chart.destroy()
+  chart = null
+})
 </script>
