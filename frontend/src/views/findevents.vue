@@ -74,7 +74,17 @@
             clickable
             :empty-text="activeQuery ? 'No events match your search.' : 'No events have been created yet.'"
             @row-click="openEvent"
-          />
+          >
+            <!-- Status column: green "Upcoming" or gray "Past" badge -->
+            <template #cell-status="{ row }">
+              <span
+                class="inline-block rounded-full px-3 py-1 text-sm font-semibold"
+                :class="isUpcoming(row) ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600'"
+              >
+                {{ isUpcoming(row) ? 'Upcoming' : 'Past' }}
+              </span>
+            </template>
+          </DataTable>
         </AsyncState>
       </div>
     </div>
@@ -93,6 +103,10 @@
 // - BUG FIXED: loadData() set this.isLoading, which was never declared in the old data option
 // - BUG FIXED: toast.error('loadData error', error) passed the error as the
 //   toast *options*, so the real message was never shown
+//
+// NEW FEATURE: Status column with an "Upcoming" / "Past" badge for each event,
+// rendered through DataTable's #cell-status slot. Sorting by Status groups
+// upcoming events first. Today's events count as upcoming.
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getEvents, searchEvents } from '../api/api'
@@ -116,11 +130,24 @@ const { data, loading, error, execute } = useApi(() =>
 
 onMounted(execute)
 
+// today's date as YYYY-MM-DD in the user's time zone
+function localToday() {
+  const now = new Date()
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
+// an event happening today still counts as upcoming
+function isUpcoming(event) {
+  return (event.date || '').substring(0, 10) >= localToday()
+}
+
 const columns = [
   { label: 'Event Name', key: 'name' },
   // show MM/DD/YYYY but sort by the real ISO date so years sort correctly
   { label: 'Event Date', key: 'date', render: (e) => formatDate(e.date), sortValue: (e) => e.date },
-  { label: 'Event Address', key: 'address.line1' }
+  { label: 'Event Address', key: 'address.line1' },
+  // Upcoming / Past badge (sorting it groups upcoming events first, then past)
+  { label: 'Status', key: 'status', sortValue: (e) => (isUpcoming(e) ? 0 : 1) }
 ]
 
 function search() {
