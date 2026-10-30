@@ -222,12 +222,16 @@ import DataTable from '../components/DataTable.vue'
 import { toDateInputValue } from '../utils/formatDate'
 import { getEventById, getEventAttendees, getServices, updateEvent, deleteEvent, messageFrom } from '../api/api'
 
+// Get the current event ID from the URL and initialize navigation,
+// notifications, and the logged-in user's store.
 const route = useRoute()
 const router = useRouter()
 const toast = useToast()
 const user = useLoggedInUserStore()
 const eventId = route.params.id
 
+// Return a fresh event object with the default form values.
+// Creating a new object each time avoids sharing nested address or array values.
 const emptyEvent = () => ({
   name: '',
   description: '',
@@ -237,27 +241,34 @@ const emptyEvent = () => ({
   services: []
 })
 
+// Reactive event form data
 const event = reactive(emptyEvent())
 const attendees = ref([]) // full client records for the attendee list
 const services = ref([]) // all services, for the checkboxes
 
+// Track data load, any loading error, and form submission or deletion.
 const loading = ref(true)
 const loadError = ref(null)
 const busy = ref(false)
 
+// Treat an empty date as valid so the required rule can show its own message.
 const validDate = (value) => !helpers.req(value) || !isNaN(new Date(value))
+
+// Validation rules for the required event name and date fields.
 const rules = {
   name: { required },
   date: { required, validDate }
 }
 const v$ = useVuelidate(rules, event)
 
+// Configure the columns shown for each attendee.
 const attendeeColumns = [
   { label: 'Name', key: 'name', render: (c) => `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() },
   { label: 'City', key: 'address.city' },
   { label: 'Phone Number', key: 'phoneNumber.primary' }
 ]
 
+// Load event, attendees, and available services, then populates the reactive form.
 async function loadAll() {
   loading.value = true
   loadError.value = null
@@ -284,8 +295,10 @@ async function loadAll() {
   }
 }
 
+// Fetch the event data when the component is mounted.
 onMounted(loadAll)
 
+// Validate the form, save the updated event, and return to the event list.
 async function submitEventUpdate() {
   const valid = await v$.value.$validate()
   if (!valid) return
