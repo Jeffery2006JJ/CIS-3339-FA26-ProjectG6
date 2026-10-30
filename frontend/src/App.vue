@@ -84,7 +84,7 @@
       <!-- Organization name header -->
       <section
         class="justify-end items-center h-24 flex"
-        style="background: linear-gradient(250deg, #c8102e 70%, #efecec 50.6%)"
+        style="background: linear-gradient(250deg, #c34c19 70%, #efecec 50.6%)"
       >
         <h1 class="mr-20 text-3xl text-white">{{ orgName }}</h1>
       </section>
