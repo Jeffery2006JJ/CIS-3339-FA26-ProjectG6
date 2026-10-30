@@ -1,4 +1,4 @@
-<!-- Login view. Users log in with theirusername and password. -->
+<!-- Login view. Users log in with their username and password. -->
 <template>
   <div>
     <h1 class="font-bold text-4xl text-red-700 tracking-widest text-center mt-10">Welcome</h1>
@@ -19,12 +19,26 @@
         <label>
           <span class="text-gray-700">Password</span>
           <span style="color: #ff0000">*</span>
-          <input
-            v-model="password"
-            type="password"
-            autocomplete="current-password"
-            class="w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
-          />
+          <!-- input + eye button side by side -->
+          <div class="relative">
+            <input
+              v-model="password"
+              :type="showPassword ? 'text' : 'password'"
+              autocomplete="current-password"
+              class="w-full pr-10 rounded-md border-gray-300 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
+            />
+            <button
+              type="button"
+              class="eye-button absolute inset-y-0 right-0 flex items-center text-gray-500 hover:text-gray-800"
+              :aria-label="showPassword ? 'Hide password' : 'Show password'"
+              :aria-pressed="showPassword"
+              @click="showPassword = !showPassword"
+            >
+              <span class="material-icons text-xl" aria-hidden="true">
+                {{ showPassword ? 'visibility_off' : 'visibility' }}
+              </span>
+            </button>
+          </div>
         </label>
       </div>
       <p v-if="formError" class="text-center text-red-600 mt-4">{{ formError }}</p>
@@ -43,36 +57,37 @@
 // - setup() { return { store } } -> const store = useLoggedInUserStore() at the top level
 // - @submit.prevent="store.login(username, password)" -> submit() function that also
 //   checks for empty fields and disables the button while the request is running
+//
+// NEW FEATURE: show/hide password toggle. The eye button flips showPassword,
+// which switches the input between type="password" and type="text".
+// It is a type="button" so clicking it never submits the form.
 import { ref } from 'vue'
 import { useLoggedInUserStore } from '../store/loggedInUser'
 
-// Access the store method that handles user authentication.
 const store = useLoggedInUserStore()
-
-// Reactive values bound to the login form fields and its UI state.
 const username = ref('')
 const password = ref('')
 const submitting = ref(false)
 const formError = ref('')
+const showPassword = ref(false) // true = password is visible
 
-// Validate the form and attempt to log in.
 async function submit() {
-    // Clear any error from a previous submission.
   formError.value = ''
-    
-  // Require both fields before sending a login request.
   if (!username.value || !password.value) {
     formError.value = 'Enter your username and password.'
     return
   }
-
-    // Disable or otherwise indicate the form is being submitted.
   submitting.value = true
   try {
     await store.login(username.value, password.value)
-  } finally {    
-    // Restore the form state whether login succeeds or fails.
+  } finally {
     submitting.value = false
   }
 }
 </script>
+
+<style scoped>
+.eye-button {
+  padding: 0 10px;
+}
+</style>
