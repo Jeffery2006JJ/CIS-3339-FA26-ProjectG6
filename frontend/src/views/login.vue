@@ -46,22 +46,32 @@
 import { ref } from 'vue'
 import { useLoggedInUserStore } from '../store/loggedInUser'
 
+// Access the store method that handles user authentication.
 const store = useLoggedInUserStore()
+
+// Reactive values bound to the login form fields and its UI state.
 const username = ref('')
 const password = ref('')
 const submitting = ref(false)
 const formError = ref('')
 
+// Validate the form and attempt to log in.
 async function submit() {
+    // Clear any error from a previous submission.
   formError.value = ''
+    
+  // Require both fields before sending a login request.
   if (!username.value || !password.value) {
     formError.value = 'Enter your username and password.'
     return
   }
+
+    // Disable or otherwise indicate the form is being submitted.
   submitting.value = true
   try {
     await store.login(username.value, password.value)
-  } finally {
+  } finally {    
+    // Restore the form state whether login succeeds or fails.
     submitting.value = false
   }
 }
