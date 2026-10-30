@@ -86,7 +86,7 @@ import { formatDate } from '../utils/formatDate'
 
 const router = useRouter()
 
-// One useApi() per dashboard widget so each can fail/retry on its own.
+// One useApi() per dashboard widget, so each can fail/retry on its own.
 const {
   data: attendanceData,
   loading: attendanceLoading,
@@ -103,7 +103,7 @@ onMounted(() => {
   loadZips()
 })
 
-// ----- Attendance -----
+// Attendance
 const recentEvents = computed(() => attendanceData.value ?? [])
 const attendanceLabels = computed(() =>
   recentEvents.value.map((event) => `${event.name} (${formatDate(event.date)})`)
@@ -121,7 +121,7 @@ const attendanceColumns = [
   }
 ]
 
-// ----- Zip codes -----
+// Zip codes 
 const zips = computed(() => zipData.value ?? [])
 const zipLabels = computed(() => zips.value.map((item) => item._id))
 const zipCounts = computed(() => zips.value.map((item) => item.count))

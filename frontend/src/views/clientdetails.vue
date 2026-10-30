@@ -339,7 +339,7 @@ function nameWithDate({ name, date }) {
   return `${name} (${formatDate(date)})`
 }
 
-// Copy API data into the reactive client, keeping default nested objects
+// Copy API data into reactive client, keeping default nested objects
 // so v-model never hits an undefined phoneNumber/address.
 function applyClient(data) {
   const base = emptyClient()

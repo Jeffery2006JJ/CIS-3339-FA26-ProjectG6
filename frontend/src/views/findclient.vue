@@ -117,7 +117,7 @@ import AsyncState from '../components/AsyncState.vue'
 
 const router = useRouter()
 
-// search form fields
+// Reactive fields used to build the client search request.
 const searchBy = ref('Client Name')
 const firstName = ref('')
 const lastName = ref('')
@@ -127,12 +127,15 @@ const phoneNumber = ref('')
 // execute() always re-runs whatever this is, so Retry repeats the last request.
 const activeQuery = ref(null)
 
+// Load either all clients or the clients matching the active search query.
 const { data, loading, error, execute } = useApi(() =>
   activeQuery.value ? searchClients(activeQuery.value) : getClients()
 )
 
+// Fetch the full client list when the component is first mounted.
 onMounted(execute)
 
+// Defines which client fields the table displays and how to format them.
 const columns = [
   { label: 'Name', key: 'name', render: (c) => `${c.firstName ?? ''} ${c.lastName ?? ''}`.trim() },
   { label: 'Phone Number', key: 'phoneNumber.primary' },
